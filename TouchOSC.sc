@@ -31,31 +31,31 @@ TouchOSCControl {
 
 TouchOSCPushButton : TouchOSCControl {
 	*new { |num=nil, page=1, server=nil, addr=nil|
-		^super.newCopyArgs('push', num, page, 1, server, addr)
+		^super.newCopyArgs('push', num, page, 1, server, addr).init
 	}
 }
 
 TouchOSCToggleButton : TouchOSCControl {
 	*new { |num=nil, page=1, server=nil, addr=nil|
-		^super.newCopyArgs('toggle', num, page, 1, server, addr)
+		^super.newCopyArgs('toggle', num, page, 1, server, addr).init
 	}
 }
 
 TouchOSCFader : TouchOSCControl {
 	*new { |num=nil, page=1, server=nil, addr=nil|
-		^super.newCopyArgs('fader', num, page, 1, server, addr)
+		^super.newCopyArgs('fader', num, page, 1, server, addr).init
 	}
 }
 
 TouchOSCXYPad : TouchOSCControl {
 	*new { |num=nil, page=1, server=nil, addr=nil|
-		^super.newCopyArgs('xy', num, page, 2, server, addr)
+		^super.newCopyArgs('xy', num, page, 2, server, addr).init
 	}
 }
 
 TouchOSCAccXYZ : TouchOSCControl {
 	*new { |server=nil, addr=nil|
-		^super.newCopyArgs('accxyz', nil, nil, 3, server, addr)
+		^super.newCopyArgs('accxyz', nil, nil, 3, server, addr).init
 	}
 }
 
