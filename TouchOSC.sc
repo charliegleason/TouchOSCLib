@@ -1,13 +1,15 @@
 TouchOSCControl {
-	var <type, <num, <page, <dim, <server;
+	var <type, <num, <page, <dim, <server, <>addr;
 	var <path, def, <bus;
 	var <hasBeenFreed = false;
 
-	*new { |type, num=nil, page=1, dim=1, server(Server.default)|
-		^super.newCopyArgs(type, num, page, dim, server).init;
+	*new { |type, num=nil, page=1, dim=1, server=nil, addr=nil|
+		^super.newCopyArgs(type, num, page, dim, server, addr).init;
 	}
 
 	init {
+		server ?? { server = Server.default; }
+		addr ?? { addr = NetAddr("0.0.0.0", 9000) };
 		path = '/' ++ page.asSymbol ++ '/' ++ type.asSymbol ++ num.asSymbol;
 		bus = Bus.control(server, dim);
 		def = OSCdef(path, { |msg| bus.set(*msg[1..dim]) }, path, addr.port);
