@@ -26,7 +26,7 @@ TouchOSCDiscreteControl {
 	*new { ^this.notYetImplemented }
 }
 
-TouchOSCButton : TouchOSCDiscreteControl {
+TouchOSCButton : TouchOSCControl {
 	*new { ^this.notYetImplemented }
 }
 
@@ -34,7 +34,7 @@ TouchOSCToggle : TouchOSCButton {
 	*new { ^this.notYetImplemented }
 }
 
-TouchOSCFader : TouchOSCContinuousControl {
+TouchOSCFader : TouchOSCControl {
 	*new { ^this.notYetImplemented }
 }
 
