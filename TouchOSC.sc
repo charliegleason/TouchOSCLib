@@ -4,7 +4,7 @@ TouchOSCControl {
 	var <hasBeenFreed = false;
 
 	*new { |type, num=nil, page=1, dim=1, server=nil, addr=nil|
-		^super.newCopyArgs(type, num, page, dim, server, addr).init;
+		^super.newCopyArgs(type, num, page, dim, server, addr).init
 	}
 
 	init {
@@ -14,6 +14,7 @@ TouchOSCControl {
 		port = if(addr.isNil.not) { addr.port } { 9000 };
 
 		server ?? { server = Server.default; };
+		~accxyz.scope;
 		path = '/' ++ (page ?? { '' }).asSymbol ++ '/' ++ type.asSymbol ++ (num ?? { '' }).asSymbol;
 		bus = Bus.control(server, dim);
 		def = OSCdef(path, { |msg| bus.set(*msg[1..dim]) }, path, ip, port);
