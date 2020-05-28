@@ -1,14 +1,14 @@
 TouchOSCControl {
-	var <controlName, <num, <page, <dim, <server;
+	var <type, <num, <page, <dim, <server;
 	var <path, def, <bus;
 	var <hasBeenFreed = false;
 
-	*new { |controlName, num=nil, page=1, dim=1, server=Server.default|
-		^super.newCopyArgs(controlName, num, page, dim, server).init;
+	*new { |type, num=nil, page=1, dim=1, server(Server.default)|
+		^super.newCopyArgs(type, num, page, dim, server).init;
 	}
 
 	init {
-		path = '/' ++ page.asSymbol ++ '/' ++ controlName.asSymbol ++ num.asSymbol;
+		path = '/' ++ page.asSymbol ++ '/' ++ type.asSymbol ++ num.asSymbol;
 		bus = Bus.control(server, dim);
 		def = OSCdef(path, { |msg| bus.set(*msg[1..dim]) }, path, addr.port);
 	}
@@ -46,10 +46,11 @@ TouchOSCMultiControl {
 
 TouchOSC {
 	var <>addr;
-	var <controls = IdentityDictionary[];
+	var <controls;
 
 	// addr: a NetAddr indicating the receive ip and port
-	*new { |addr| super.newCopyArgs(addr); }
+	*new { |addr| ^super.newCopyArgs(addr).init }
+	init { controls = IdentityDictionary[]; }
 	add { |control| controls[control.controlName] = control; }
 
 	// remove { |control|
