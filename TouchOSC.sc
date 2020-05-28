@@ -22,6 +22,7 @@ TouchOSCControl {
 	scope { bus.scope; }
 }
 
+/*
 TouchOSCDiscreteControl {
 	*new { ^this.notYetImplemented }
 }
@@ -41,6 +42,7 @@ TouchOSCFader : TouchOSCControl {
 TouchOSCMultiControl {
 	*new { ^this.notYetImplemented }
 }
+*/
 
 TouchOSC {
 	var <>addr;
