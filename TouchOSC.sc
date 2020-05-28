@@ -10,7 +10,7 @@ TouchOSCControl {
 	init {
 		server ?? { server = Server.default; };
 		addr ?? { addr = NetAddr("0.0.0.0", 9000); };
-		path = '/' ++ page.asSymbol ++ '/' ++ type.asSymbol ++ num.asSymbol;
+		path = '/' ++ page.asSymbol ++ '/' ++ type.asSymbol ++ (num ?? { '' }).asSymbol;
 		bus = Bus.control(server, dim);
 		def = OSCdef(path, { |msg| bus.set(*msg[1..dim]) }, path, addr.port);
 	}
@@ -21,39 +21,47 @@ TouchOSCControl {
 		hasBeenFreed = true;
 	}
 
-	scope { bus.scope; }
+	scope { bus.scope }
 }
 
-/*
-TouchOSCDiscreteControl {
-	*new { ^this.notYetImplemented }
+TouchOSCPushButton : TouchOSCControl {
+	*new { |num=nil, page=1, server=nil, addr=nil|
+		^super.newCopyArgs('push', num, page, 1, server, addr)
+	}
 }
 
-TouchOSCButton : TouchOSCControl {
-	*new { ^this.notYetImplemented }
-}
-
-TouchOSCToggle : TouchOSCButton {
-	*new { ^this.notYetImplemented }
+TouchOSCToggleButton : TouchOSCControl {
+	*new { |num=nil, page=1, server=nil, addr=nil|
+		^super.newCopyArgs('toggle', num, page, 1, server, addr)
+	}
 }
 
 TouchOSCFader : TouchOSCControl {
-	*new { ^this.notYetImplemented }
+	*new { |num=nil, page=1, server=nil, addr=nil|
+		^super.newCopyArgs('fader', num, page, 1, server, addr)
+	}
 }
 
-TouchOSCMultiControl {
-	*new { ^this.notYetImplemented }
+TouchOSCXYPad : TouchOSCControl {
+	*new { |num=nil, page=1, server=nil, addr=nil|
+		^super.newCopyArgs('fader', num, page, 2, server, addr)
+	}
 }
-*/
 
 TouchOSC {
-	var <>addr;
+	var <>addr, <server;
 	var <controls;
 
 	// addr: a NetAddr indicating the receive ip and port
-	*new { |addr| ^super.newCopyArgs(addr).init }
-	init { controls = IdentityDictionary[]; }
-	add { |control| controls[control.controlName] = control; }
+	*new { |addr=nil, server=nil| ^super.newCopyArgs(addr, server).init }
 
-	// remove { |control|
+	init {
+		server ?? { server = Server.default; };
+		addr ?? { addr = NetAddr("0.0.0.0", 9000); };
+		controls = IdentityDictionary[];
+	}
+
+	add { |control|
+		(controls[control.type] ?? { controls[control.type] = List[]; }).add(control);
+	}
 }
