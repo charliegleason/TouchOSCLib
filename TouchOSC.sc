@@ -8,11 +8,15 @@ TouchOSCControl {
 	}
 
 	init {
+		var ip, port;
+
+		ip = addr !? { addr.ip };
+		port = if(addr.isNil.not) { addr.port } { 9000 };
+
 		server ?? { server = Server.default; };
-		addr ?? { addr = NetAddr("0.0.0.0", 9000); };
-		path = '/' ++ page.asSymbol ++ '/' ++ type.asSymbol ++ (num ?? { '' }).asSymbol;
+		path = '/' ++ (page ?? { '' }).asSymbol ++ '/' ++ type.asSymbol ++ (num ?? { '' }).asSymbol;
 		bus = Bus.control(server, dim);
-		def = OSCdef(path, { |msg| bus.set(*msg[1..dim]) }, path, addr.port);
+		def = OSCdef(path, { |msg| bus.set(*msg[1..dim]) }, path, ip, port);
 	}
 
 	free {
@@ -44,7 +48,13 @@ TouchOSCFader : TouchOSCControl {
 
 TouchOSCXYPad : TouchOSCControl {
 	*new { |num=nil, page=1, server=nil, addr=nil|
-		^super.newCopyArgs('fader', num, page, 2, server, addr)
+		^super.newCopyArgs('xy', num, page, 2, server, addr)
+	}
+}
+
+TouchOSCAccXYZ : TouchOSCControl {
+	*new { |server=nil, addr=nil|
+		^super.newCopyArgs('accxyz', nil, nil, 3, server, addr)
 	}
 }
 
@@ -62,6 +72,7 @@ TouchOSC {
 	}
 
 	add { |control|
-		(controls[control.type] ?? { controls[control.type] = List[]; }).add(control);
+		controls[control.type] ?? { controls[control.type] = List[]; };
+		controls[control.type].add(control);
 	}
 }
