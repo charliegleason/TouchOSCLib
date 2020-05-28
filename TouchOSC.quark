@@ -1,0 +1,10 @@
+(
+  name: "TouchOSC",
+  summary: "Easy layout setup with TouchOSC",
+  version: "0.0.1",
+  schelp: "TouchOSC",
+  dependencies: [],
+  license: "GPL",
+  copyright: "Charlie Gleason, May 2020"
+)
+// vim: set filetype=supercollider:
