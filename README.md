@@ -9,6 +9,11 @@ This library is currently in very early stages of development. At the time of wr
 "Simple" interface has been implemented in `TouchOSCLayout` and multi-controls (such as
 multisliders, multi-touch XY pad, etc.) have yet to be implemented.
 
+# Installation
+```supercollider
+Quarks.install("https://github.com/cardinalsine/TouchOSCLib");
+```
+
 # Usage
 
 Example:
