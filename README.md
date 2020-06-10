@@ -48,8 +48,8 @@ Pfunc { ~touchOSC[0].fader[4].bus.getSynchronous };
     class matches this.
 
     There are a couple conditions where specifying an IP address is necessary:
-        - You aren't on a private network (such as your home WiFi)
-        - You're using multiple devices running TouchOSC, each using the same layout
+    - You aren't on a private network (such as your home WiFi)
+    - You're using multiple devices running TouchOSC, each using the same layout
 
     In the first case, listening on all interfaces (i.e. accepting any UDP message on the chosen
     port) is a security issue, which is mitigated by listening only for messages from a trusted
@@ -63,7 +63,7 @@ Pfunc { ~touchOSC[0].fader[4].bus.getSynchronous };
 
 ### Instance methods
 
-`.at(index)`: Accesses the `TouchOSCPage` at the given index, starting from zero.
+`.at(index)`: Accesses the `TouchOSCPage` at the given `index`, starting from zero.
 
 Example:
 ```supercollider
