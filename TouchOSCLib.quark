@@ -3,7 +3,7 @@
   summary: "Easy layout setup with TouchOSC",
   version: "0.0.1",
   schelp: "TouchOSC",
-  dependencies: [],
+  dependencies: ["XML"],
   license: "GPL",
   copyright: "Charlie Gleason, May 2020"
 )
