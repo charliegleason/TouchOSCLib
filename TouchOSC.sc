@@ -1,21 +1,42 @@
 TouchOSCControl {
-	var <type, <num, <page, <dim, <server, <addr;
-	var <path, def, <bus;
+	var <type, <prefix, <suffix, <dim, <server, <addr;
+	var <sizeX, <sizeY;
+	var <path, defs, <bus;
 	var <active = false;
 
-	*new { |type, num=nil, page=nil, dim=1, server=nil, addr=nil|
-		^super.newCopyArgs(type, num, page, dim, server, addr).init;
+	*new { |type, prefix=nil, suffix=nil, dim=nil, server=nil, addr=nil|
+		^super.newCopyArgs(type, prefix, suffix, dim, server, addr).init
 	}
 
 	init {
-		var ip, port;
+		var ip, port, paths;
 
 		ip = try { if(addr.ip == "0.0.0.0") { nil } { addr } } { nil };
 		port = try { addr.port } { 9000 };
-		path = this.buildPath(type, page, num);
-		server = server ?? { Server.default };
-		bus = Bus.control(server, dim);
-		def = OSCdef(path, { |msg| bus.set(*msg[1..dim]) }, path, ip, port);
+		path = this.buildPath(type, prefix, suffix);
+		server = server ? Server.default;
+		dim = dim ? 1;
+
+		case { dim.size > 1 } {
+			bus = Bus.control(server, dim.product);
+			defs = Array.fillND(dim[1..]) { |...args|
+				var offset, coordPath = path;
+				do(args) { |a| coordPath = coordPath ++ '/' ++ (a + 1).asSymbol; };
+				offset = (dim[1] * args[0] + args[1]) * dim[0];
+				OSCdef(coordPath, { |msg| bus.setAt(offset, *msg[1..dim[0]]) }, coordPath, ip, port)
+			};
+			defs.flatten;
+
+		} { dim.size == 1 } {
+			bus = Bus.control(server, dim[0]);
+			defs = Array[OSCdef(path, { |msg| bus.set(*msg[1..dim[0]]) }, path, ip, port)];
+
+		} { dim.size == 0 } {
+			dim.tryPerform(\isEmpty) !? { "Dimensions cannot be empty".throw; };
+			bus = Bus.control(server, dim);
+			defs = Array[OSCdef(path, { |msg| bus.set(*msg[1..dim]) }, path, ip, port)];
+		};
+
 		active = true;
 	}
 
@@ -29,7 +50,9 @@ TouchOSCControl {
 
 	free {
 		bus.free;
-		def.free;
+		while { not(defs.isEmpty) } {
+			defs.pop.free;
+		};
 		active = false;
 	}
 
@@ -45,44 +68,39 @@ TouchOSCControl {
 	}
 }
 
-TouchOSCMultiControl {
-	var <type, <num, <page, <sizeX, <sizeY, <dim, <server, <addr;
-	// TODO
-}
-
 TouchOSCPush : TouchOSCControl {
-	*new { |num=nil, page=1, server=nil, addr=nil|
-		^super.newCopyArgs('push', num, page, 1, server, addr).init
+	*new { |prefix=nil, suffix=nil, server=nil, addr=nil|
+		^super.newCopyArgs('push', prefix, suffix, 1, server, addr).init
 	}
 }
 
 TouchOSCToggle : TouchOSCControl {
-	*new { |num=nil, page=1, server=nil, addr=nil|
-		^super.newCopyArgs('toggle', num, page, 1, server, addr).init
+	*new { |prefix=nil, suffix=nil, server=nil, addr=nil|
+		^super.newCopyArgs('toggle', prefix, suffix, 1, server, addr).init
 	}
 }
 
 TouchOSCFader : TouchOSCControl {
-	*new { |num=nil, page=1, server=nil, addr=nil|
-		^super.newCopyArgs('fader', num, page, 1, server, addr).init
+	*new { |prefix=nil, suffix=nil, server=nil, addr=nil|
+		^super.newCopyArgs('fader', prefix, suffix, 1, server, addr).init
 	}
 }
 
 TouchOSCXY : TouchOSCControl {
-	*new { |num=nil, page=1, server=nil, addr=nil|
-		^super.newCopyArgs('xy', num, page, 2, server, addr).init
+	*new { |prefix=nil, suffix=nil, server=nil, addr=nil|
+		^super.newCopyArgs('xy', prefix, suffix, 2, server, addr).init
 	}
 }
 
 TouchOSCRotary : TouchOSCControl {
-	*new { |num=nil, page=1, server=nil, addr=nil|
-		^super.newCopyArgs('rotary', num, page, 1, server, addr).init
+	*new { |prefix=nil, suffix=nil, server=nil, addr=nil|
+		^super.newCopyArgs('rotary', prefix, suffix, 1, server, addr).init
 	}
 }
 
 TouchOSCEncoder : TouchOSCControl {
-	*new { |num=nil, page=1, server=nil, addr=nil|
-		^super.newCopyArgs('encoder', num, page, 1, server, addr).init
+	*new { |prefix=nil, suffix=nil, server=nil, addr=nil|
+		^super.newCopyArgs('encoder', prefix, suffix, 1, server, addr).init
 	}
 }
 
@@ -96,11 +114,31 @@ TouchOSCAccXYZ : TouchOSCControl {
 // TODO: TouchOSCLabel
 // TODO: TouchOSCBattery
 // TODO: TouchOSCTime
-// TODO: TouchOSCMultiPush
-// TODO: TouchOSCMultiToggle
-// TODO: TouchOSCMultiXY
-// TODO: TouchOSCMultiFader
 // TODO: TouchOSCTouch
+
+TouchOSCMultiPush : TouchOSCControl {
+	*new { |prefix=nil, suffix=nil, dim=nil, server=nil, addr=nil|
+		^super.newCopyArgs('multipush', prefix, suffix, [1] ++ dim[0] ++ dim[1], server, addr).init
+	}
+}
+
+TouchOSCMultiToggle : TouchOSCControl {
+	*new { |prefix=nil, suffix=nil, dim=nil, server=nil, addr=nil|
+		^super.newCopyArgs('multitoggle', prefix, suffix, [1] ++ dim[0] ++ dim[1], server, addr).init
+	}
+}
+
+TouchOSCMultiXY : TouchOSCControl {
+	*new { |prefix=nil, suffix=nil, dim=nil, server=nil, addr=nil|
+		^super.newCopyArgs('multixy', prefix, suffix, [2] ++ dim[0], server, addr).init
+	}
+}
+
+TouchOSCMultiFader : TouchOSCControl {
+	*new { |prefix=nil, suffix=nil, dim=nil, server=nil, addr=nil|
+		^super.newCopyArgs('multifader', prefix, suffix, [1] ++ dim[0], server, addr).init
+	}
+}
 
 TouchOSCPage[] {
 	var <server, <>addr;
@@ -113,13 +151,13 @@ TouchOSCPage[] {
 	}
 
 	init {
-		server = server ?? { Server.default };
-		addr = addr ?? { NetAddr(nil, 9000) };
+		server = server ? Server.default;
+		addr = addr ? NetAddr(nil, 9000);
 		controls = IdentityDictionary[];
 	}
 
 	add { |control|
-		controls[control.type] ?? { controls[control.type] = List[] };
+		controls[control.type] = controls[control.type] ? List[];
 		controls[control.type].add(control);
 	}
 
@@ -177,22 +215,26 @@ TouchOSCLayout[] {
 
 	*simple { |server=nil, addr=nil|
 		var instance = this.new(server, addr);
-
-		do(4) { |i|
-			instance.add(TouchOSCPage(server, addr));
-			// Add 4 toggle buttons to each page
-			do(4) { |j|
-				instance.pages[i].add(TouchOSCToggle(j + 1, i + 1, server, addr));
+		var add4Toggles = { |pIndex|
+			do(4) { |i|
+				instance.pages[pIndex].add(TouchOSCToggle(pIndex + 1, i + 1, server, addr));
 			};
 		};
+		// Add pages
+		do(4) { |i| instance.add(TouchOSCPage(server, addr)); };
 		// Page 1
-		do(5) { |i| instance.pages[0].add(TouchOSCFader(i + 1, 1, server, addr)); };
+		do(5) { |i| instance.pages[0].add(TouchOSCFader(1, i + 1, server, addr)); };
+		add4Toggles.(0);
 		// Page 2
-		do(16) { |i| instance.pages[1].add(TouchOSCPush(i + 1, 2, server, addr)); };
+		do(16) { |i| instance.pages[1].add(TouchOSCPush(2, i + 1, server, addr)); };
+		add4Toggles.(1);
 		// Page 3
-		instance.pages[2].add(TouchOSCXY(nil, 3, server, addr));
+		instance.pages[2].add(TouchOSCXY(3, nil, server, addr));
+		add4Toggles.(2);
 		// Page 4
 		// TODO: multitoggle
+		instance.pages[3].add(TouchOSCMultiToggle(4, nil, [8, 8], server, addr));
+		add4Toggles.(3);
 
 		^instance
 	}
@@ -239,7 +281,7 @@ TouchOSCLayout[] {
 
 		text = String.newClear;
 
-		if((fileName endsWith: ".touchosc") and: (thisProcess.platform isKindOf: UnixPlatform)) {
+		if(fileName.endsWith(".touchosc") and: thisProcess.platform.isKindOf(UnixPlatform)) {
 			// Assume gzipped XML
 			file = Pipe("cat " ++ fileName ++ " | gunzip", "r");
 		} {
@@ -305,7 +347,7 @@ TouchOSC {
 	init {
 		server = server ?? { Server.default };
 		addr = addr ?? { NetAddr(nil, 9000) };
-		accxyz = if (enableAccXYZ) { TouchOSCAccXYZ.new };
+		accxyz = if(enableAccXYZ) { TouchOSCAccXYZ.new };
 		layout = layoutName !? {
 			TouchOSCLayout.tryPerform(layoutName.asSymbol, server, addr)
 		} ?? {
@@ -314,7 +356,7 @@ TouchOSC {
 	}
 
 	layout_ { |newLayout|
-		layout !? { "Freeing layout".postln; layout.free };
+		layout !? { layout.free; };
 		layout = newLayout;
 	}
 
