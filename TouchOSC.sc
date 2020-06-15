@@ -1,7 +1,6 @@
 TouchOSCControl {
 	var <type, <prefix, <suffix, <dim, <server, <addr;
-	var <sizeX, <sizeY;
-	var <path, defs, <bus;
+	var <path, defs, <bus, <elementDim, <sizeX, <sizeY;
 	var <active = false;
 
 	*new { |type, prefix=nil, suffix=nil, dim=nil, server=nil, addr=nil|
@@ -9,50 +8,65 @@ TouchOSCControl {
 	}
 
 	init {
-		var ip, port, paths;
-
-		ip = try { if(addr.ip == "0.0.0.0") { nil } { addr } } { nil };
-		port = try { addr.port } { 9000 };
+		var ip, port;
+		addr = addr ? NetAddr("0.0.0.0", nil);
+		ip = try { if(addr.ip == "0.0.0.0") { nil } { NetAddr(addr.ip) } } { nil };
+		port = try { if(addr.port.isNil) { 9000 } { addr.port } } { 9000 };
 		path = this.buildPath(type, prefix, suffix);
 		server = server ? Server.default;
 		dim = dim ? 1;
-
-		case { dim.size > 1 } {
-			bus = Bus.control(server, dim.product);
-			defs = Array.fillND(dim[1..]) { |...args|
-				var offset, coordPath = path;
-				do(args) { |a| coordPath = coordPath ++ '/' ++ (a + 1).asSymbol; };
-				offset = (dim[1] * args[0] + args[1]) * dim[0];
-				OSCdef(coordPath, { |msg| bus.setAt(offset, *msg[1..dim[0]]) }, coordPath, ip, port)
-			};
-			defs.flatten;
-
-		} { dim.size == 1 } {
-			bus = Bus.control(server, dim[0]);
-			defs = Array[OSCdef(path, { |msg| bus.set(*msg[1..dim[0]]) }, path, ip, port)];
-
-		} { dim.size == 0 } {
+		# elementDim, sizeX, sizeY = try { dim[..2] } { dim.asArray };
+		bus = Bus.control(server, dim.asArray.product);
+		defs = case { dim.size >= 2 } { // is a collection specifying the dimensions of a multi-control
+			// In this case:
+			// - elementDim (dim[0]) is the number of dimensions each element in a multi-control has
+			// - sizeX (dim[1]) is the number of elements the multi-control has (or the horizontal/x
+			// dimension if dim[2] is also specified).
+			// - sizeY (dim[2]) is the number of elements the multi-control has in the vertical/y dimension
+			Array.fillND(dim[1..]) { |...args|
+				var i, j, offset, coordPath = path;
+				# i, j = args[..1];
+				do(args) { |index|
+					coordPath = coordPath ++ '/' ++ (index + 1).asSymbol;
+				};
+				offset = if(sizeY.notNil) {
+					((sizeY * j) + i) * elementDim
+				} {
+					i * elementDim
+				};
+				OSCdef(coordPath, { |msg| bus.setAt(offset, *msg[1..elementDim]) }, coordPath, ip, port)
+			}.flatten
+		} { dim.size >= 0 } { // is either a number or an ordered collection of size 0 or 1
+			// Test whether dim is an empty collection. Numbers don't understand .isEmpty
 			dim.tryPerform(\isEmpty) !? { "Dimensions cannot be empty".throw; };
-			bus = Bus.control(server, dim);
-			defs = Array[OSCdef(path, { |msg| bus.set(*msg[1..dim]) }, path, ip, port)];
+			Array[OSCdef(path, { |msg| bus.set(*msg[1..dim.asArray[0]]) }, path, ip, port)]
+		} { true } { // else
+			"Dimensions must be an integer or an ordered collection of integers".throw;
 		};
-
 		active = true;
+		this.reset;
 	}
 
 	ar { |numChannels, offset=0| ^bus.ar(numChannels, offset) }
 
 	kr { |numChannels, offset=0| ^bus.kr(numChannels, offset) }
 
-	set { |value|
-		//TODO: set value and send message to TouchOSC to update displayed value
+	get {
+		// TODO: return an array that reflects the physical layout
+		^if(server.hasShmInterface) { bus.getnSynchronous } { bus.getn }
 	}
+
+	set { |...args|
+		// TODO: set by index/indices
+		if(server.hasShmInterface) { bus.setnSynchronous(args); } { bus.setn(args); };
+		do(defs.collect(_.path)) { |path, i| addr.sendMsg(path, args[i]); };
+	}
+
+	reset { this.set(*(0 ! dim.asArray.product)); }
 
 	free {
 		bus.free;
-		while { not(defs.isEmpty) } {
-			defs.pop.free;
-		};
+		while { defs.isEmpty.not } { defs.pop.free; };
 		active = false;
 	}
 
@@ -62,9 +76,14 @@ TouchOSCControl {
 
 	buildPath { |name, prefix=nil, suffix=nil|
 		var path = '/' ++ name.asSymbol;
-		prefix !? { path = '/' ++ prefix.asSymbol ++ path; };
+		prefix !? { path = prefix.asSymbol ++ path; };
 		suffix !? { path = path ++ suffix.asSymbol; };
+		if(path.asString.beginsWith("/").not) { path = '/' ++ path; };
 		^path
+	}
+
+	getDef { |i=nil, j=nil|
+		// TODO: index defs depending on whether sizeX and sizeY are set
 	}
 }
 
@@ -110,6 +129,14 @@ TouchOSCAccXYZ : TouchOSCControl {
 	}
 }
 
+TouchOSCMultiXY : TouchOSCControl {
+	// NOTE: this does not have a dim argument, unlike all the other multi-controls
+	*new { |prefix=nil, suffix=nil, server=nil, addr=nil|
+		// Assumes 1 person is using a given MultiXY and has at most 10 fingers
+		^super.newCopyArgs('multixy', prefix, suffix, [2, 10], server, addr).init
+	}
+}
+
 // TODO: TouchOSCLED
 // TODO: TouchOSCLabel
 // TODO: TouchOSCBattery
@@ -118,25 +145,19 @@ TouchOSCAccXYZ : TouchOSCControl {
 
 TouchOSCMultiPush : TouchOSCControl {
 	*new { |prefix=nil, suffix=nil, dim=nil, server=nil, addr=nil|
-		^super.newCopyArgs('multipush', prefix, suffix, [1] ++ dim[0] ++ dim[1], server, addr).init
+		^super.newCopyArgs('multipush', prefix, suffix, [1] ++ dim[..1], server, addr).init
 	}
 }
 
 TouchOSCMultiToggle : TouchOSCControl {
 	*new { |prefix=nil, suffix=nil, dim=nil, server=nil, addr=nil|
-		^super.newCopyArgs('multitoggle', prefix, suffix, [1] ++ dim[0] ++ dim[1], server, addr).init
-	}
-}
-
-TouchOSCMultiXY : TouchOSCControl {
-	*new { |prefix=nil, suffix=nil, dim=nil, server=nil, addr=nil|
-		^super.newCopyArgs('multixy', prefix, suffix, [2] ++ dim[0], server, addr).init
+		^super.newCopyArgs('multitoggle', prefix, suffix, [1] ++ dim[..1], server, addr).init
 	}
 }
 
 TouchOSCMultiFader : TouchOSCControl {
 	*new { |prefix=nil, suffix=nil, dim=nil, server=nil, addr=nil|
-		^super.newCopyArgs('multifader', prefix, suffix, [1] ++ dim[0], server, addr).init
+		^super.newCopyArgs('multifader', prefix, suffix, [1] ++ dim.asArray[0], server, addr).init
 	}
 }
 
@@ -151,8 +172,8 @@ TouchOSCPage[] {
 	}
 
 	init {
-		server = server ? Server.default;
-		addr = addr ? NetAddr(nil, 9000);
+		server = server ?? { Server.default };
+		addr = addr ?? { NetAddr(nil, 9000) };
 		controls = IdentityDictionary[];
 	}
 
@@ -192,11 +213,11 @@ TouchOSCLayout[] {
 			"rotaryh" -> TouchOSCRotary,
 			"encoder" -> TouchOSCEncoder,
 			"xy" -> TouchOSCXY,
-			"multipush" -> nil,
-			"multitoggle" -> nil,
-			"multixy" -> nil,
-			"multifaderv" -> nil,
-			"multifaderh" -> nil,
+			"multipush" -> TouchOSCMultiPush,
+			"multitoggle" -> TouchOSCMultiToggle,
+			"multixy" -> TouchOSCMultiXY,
+			"multifaderv" -> TouchOSCMultiFader,
+			"multifaderh" -> TouchOSCMultiFader,
 			"led" -> nil,
 			"labelv" -> nil,
 			"labelh" -> nil,
@@ -298,11 +319,11 @@ TouchOSCLayout[] {
 		^text
 	}
 
-	getRoot { |text| ^DOMDocument.new.parseXML(text).getDocumentElement }
+	getRoot { |text| ^DOMDocument().parseXML(text).getDocumentElement }
 
 	buildLayout { |root|
 		var tabpages = root.getElementsByTagName("tabpage");
-		if(not(pages.isEmpty)) { this.free; };
+		if(pages.isEmpty.not) { this.free; };
 		// Build the layout
 		do(tabpages) { |tabpage, i|
 			this.add(this.buildPage(tabpage, pageSchema.(i)));
@@ -310,20 +331,37 @@ TouchOSCLayout[] {
 	}
 
 	buildPage { |tabpage, pageID|
-		var page, counts, control, controls, type, class, controlID;
+		var page, counts, controls;
 
 		page = TouchOSCPage(server, addr);
 		controls = tabpage.getElementsByTagName("control");
 		counts = types.values.collect(_ -> 0).asDict;
 
 		do(controls) { |control|
-			type = control.getAttribute("type");
+			var type = control.getAttribute("type");
 
 			if(types.keys includes: type) {
+				var class, instance, controlID;
 				class = types[type];
 				controlID = controlSchema.(counts[class]);
-				control = class.new(controlID, pageID, server, addr);
-				page.add(control);
+
+				instance = case {
+					control.hasAttribute("number_x") and: control.hasAttribute("number_y")
+				} {
+					// is a 2D arrayed control
+					var dim = collect(["number_x", "number_y"]) { |attr|
+						control.getAttribute(attr).asInteger
+					};
+					class.new(pageID, controlID, dim, server, addr)
+				} { control.hasAttribute("number") } {
+					// is a 1D arrayed control
+					var dim = [control.getAttribute("number").asInteger];
+					class.new(pageID, controlID, dim, server, addr)
+				} { true } { // else
+					// is not an arrayed control or is a multixy
+					class.new(pageID, controlID, server, addr)
+				};
+				page.add(instance);
 				counts[class] = counts[class] + 1;
 			} {
 				("Unrecognized control type: " ++ type).warn;
@@ -336,7 +374,8 @@ TouchOSCLayout[] {
 // TODO: free buses when no longer in use or on CmdPeriod
 // TODO: GUI
 TouchOSC {
-	var <server, <addr, enableAccXYZ, layoutName, <pageSchema, <controlSchema, <accxyz, <layout;
+	var <server, <addr, enableAccXYZ, layoutName, <pageSchema, <controlSchema;
+	var <accxyz, <layout;
 
 	// addr: a NetAddr indicating the receive ip and port
 	// server: a Server to allocate control buses on
@@ -347,7 +386,7 @@ TouchOSC {
 	init {
 		server = server ?? { Server.default };
 		addr = addr ?? { NetAddr(nil, 9000) };
-		accxyz = if(enableAccXYZ) { TouchOSCAccXYZ.new };
+		accxyz = if(enableAccXYZ) { TouchOSCAccXYZ() };
 		layout = layoutName !? {
 			TouchOSCLayout.tryPerform(layoutName.asSymbol, server, addr)
 		} ?? {
