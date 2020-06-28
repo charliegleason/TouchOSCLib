@@ -10,8 +10,10 @@ TouchOSCControl {
 	init {
 		var ip, port;
 		addr = addr ? NetAddr("0.0.0.0", nil);
-		ip = try { if(addr.ip == "0.0.0.0") { nil } { NetAddr(addr.ip) } } { nil };
-		port = try { if(addr.port.isNil) { 9000 } { addr.port } } { 9000 };
+		//ip = try { if(addr.ip == "0.0.0.0") { nil } { NetAddr(addr.ip) } } { nil };
+		ip = try { if(addr.ip != "0.0.0.0") { NetAddr(addr.ip) } };
+		//port = try { if(addr.port.isNil) { 9000 } { addr.port } } { 9000 };
+		port = try { addr.port } ? 9000;
 		path = this.buildPath(type, prefix, suffix);
 		server = server ? Server.default;
 		dim = dim ? 1;
@@ -71,6 +73,11 @@ TouchOSCControl {
 	}
 
 	scope { ^bus.scope }
+
+	mapTo { |obj ...args|
+		// TODO: map bus(es) to Synth, NodeProxy, etc. controls
+		// Could use a list of Symbols?
+	}
 
 	// Private methods
 
@@ -161,6 +168,9 @@ TouchOSCMultiFader : TouchOSCControl {
 	}
 }
 
+// TODO: make TouchOSCPage inherit from TouchOSCControl to capture page changes?
+// Alternatively, use multiple OSCdefs in TouchOSCLayout to set the value of a single bus
+// to the index of the current page
 TouchOSCPage[] {
 	var <server, <>addr;
 	var <controls;
@@ -198,6 +208,7 @@ TouchOSCPage[] {
 	}
 }
 
+// TODO: ability to automatically generate layouts?
 TouchOSCLayout[] {
 	var <server, <>addr, <pageSchema, <controlSchema;
 	var <pages;
@@ -279,8 +290,8 @@ TouchOSCLayout[] {
 	}
 
 	init {
-		server = server ?? { Server.default };
-		addr = addr ?? { NetAddr(nil, 9000) };
+		server = server ? Server.default;
+		addr = addr ? NetAddr(nil, 9000);
 		pages = List[];
 		pageSchema = pageSchema ?? { _ + 1 };
 		controlSchema = controlSchema ?? { _ + 1 };
@@ -299,9 +310,7 @@ TouchOSCLayout[] {
 
 	getText { |fileName|
 		var file, line, text;
-
 		text = String.newClear;
-
 		if(fileName.endsWith(".touchosc") and: thisProcess.platform.isKindOf(UnixPlatform)) {
 			// Assume gzipped XML
 			file = Pipe("cat " ++ fileName ++ " | gunzip", "r");
@@ -309,7 +318,6 @@ TouchOSCLayout[] {
 			// Assume plain XML
 			file = File(fileName, "r");
 		};
-
 		line = file.getLine;
 		while { line.notNil } {
 			text = text ++ line;
