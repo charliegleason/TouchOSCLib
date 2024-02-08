@@ -11,7 +11,7 @@ multisliders, multi-touch XY pad, etc.) have yet to be implemented.
 
 # Installation
 ```supercollider
-Quarks.install("https://github.com/cardinalsine/TouchOSCLib");
+Quarks.install("https://github.com/charliegleason/TouchOSCLib");
 ```
 
 # Usage
